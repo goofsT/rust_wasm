@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAssembly 性能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        #results {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        #results-wasm {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+
+
+        .result-item {
+            margin-bottom: 10px;
+        }
+
+        .processing-time {
+            font-weight: bold;
+            color: #d9534f;
+        }
+
+        .controls {
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin-right: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>JavaScript 复杂计算性能测试</h1>
+
+    <div class="controls">
+        <button id="startBtn">开始测试</button>
+        <button id="stopBtn">停止测试</button>
+    </div>
+
+    <div id="results">
+        <h2>worker计算结果</h2>
+        <div id="result-container">点击"开始测试"按钮开始...</div>
+        <div id="memory-info">内存使用: 等待中...</div>
+    </div>
+    <div id="results-wasm">
+        <h2>WASM计算结果</h2>
+        <div id="result-container-wasm">点击"开始测试"按钮开始...</div>
+        <div id="memory-info-wasm">内存使用: 等待中...</div>
+    </div>
+    <div id="results-wasm-zero-copy">
+        <h2>WASM零拷贝计算结果</h2>
+        <div id="result-container-wasm-zero-copy">点击"开始测试"按钮开始...</div>
+        <div id="memory-info-wasm-zero-copy">内存使用: 等待中...</div>
+    </div>
+
+    <script type="module">
+        // 全局变量
+        let worker = null;
+        let sharedArrayBuffer = null;
+        let sharedArray = null;
+
+        let workerWasm = null;
+        let sharedArrayBufferWasm = null;
+        let sharedArrayWasm = null;
+
+        let workerWasmZeroCopy = null;
+        let sharedArrayBufferWasmZeroCopy = null;
+        let sharedArrayWasmZeroCopy = null;
+
+
+        let timer = null;
+        let timer1 = null;
+        let timer2 = null;
+        let isRunning = false;
+        let calculationCount = 0;
+        let calculationCountWasm = 0;
+        let calculationCountWasmZeroCopy = 0;
+        const bufferSize = 1000;
+
+        const resultContainer = document.getElementById('result-container');
+        const resultContainerWasm = document.getElementById('result-container-wasm');
+        const resultContainerWasmZeroCopy = document.getElementById('result-container-wasm-zero-copy');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+
+
+        // 初始化
+        function initTest() {
+            // 确保之前的资源被清理
+            cleanupResources();
+
+            // 创建新的共享内存和Worker
+            sharedArrayBuffer = new SharedArrayBuffer(bufferSize * 4);
+            sharedArray = new Int32Array(sharedArrayBuffer);
+
+            sharedArrayBufferWasm = new SharedArrayBuffer(bufferSize * 4);
+            sharedArrayWasm = new Int32Array(sharedArrayBufferWasm);
+
+            worker = new Worker("./worker.js", { type: 'module' });
+            workerWasm = new Worker("./worker-wasm.js", { type: 'module' });
+            workerWasmZeroCopy = new Worker("./worker-wasm-zero-copy.js", { type: 'module' });
+
+
+            // 设置Worker消息处理
+            worker.onmessage = (e) => {
+                if (e.data.action === 'process') {
+                    if (!isRunning) return;
+                    const { sum, processingTime } = e.data;
+                    resultContainer.innerHTML = `
+                    <div class="result-item">计算 #${calculationCount} 完成</div>
+                    <div class="result-item">处理时间: <span class="processing-time">${processingTime.toFixed(2)} 毫秒</span></div>
+                    <div class="result-item">总和: ${sum}</div>
+                `;
+                    timer = setTimeout(updateSharedArray, 1000);
+                }else if(e.data.action==='error'){
+                    console.error(e.data.error)
+                    resultContainer.innerHTML = "测试出错";
+                }
+            };
+            workerWasm.onmessage = (e) => {
+                if (e.data.action === 'process') {
+                    if (!isRunning) return;
+                    const { sum, processingTime } = e.data;
+                    resultContainerWasm.innerHTML = `
+                    <div class="result-item">计算 #${calculationCountWasm} 完成</div>
+                    <div class="result-item">处理时间: <span class="processing-time">${processingTime.toFixed(2)} 毫秒</span></div>
+                    <div class="result-item">总和: ${sum}</div>
+                `;
+                    timer1 = setTimeout(updateSharedArrayWasm, 1000);
+                }else if(e.data.action==='error'){
+                    console.error(e.data.error)
+                    resultContainerWasm.innerHTML = "测试出错";
+                }else {
+                    console.log(e.data)
+                }
+            };
+            workerWasmZeroCopy.onmessage = (e) => {
+                if (e.data.action === 'process') {
+                    if (!isRunning) return;
+                    const { sum, processingTime } = e.data;
+                    resultContainerWasmZeroCopy.innerHTML = `
+                    <div class="result-item">计算 #${calculationCountWasmZeroCopy} 完成</div>
+                    <div class="result-item">处理时间: <span class="processing-time">${processingTime.toFixed(2)} 毫秒</span></div>
+                    <div class="result-item">总和: ${sum}</div>
+                `;
+                    timer2 = setTimeout(updateSharedArrayWasmZeroCopy, 1000);
+                }
+            };
+
+            isRunning = true;
+            calculationCount = 0;
+            calculationCountWasm = 0;
+            calculationCountWasmZeroCopy = 0;
+            updateSharedArray();
+            updateSharedArrayWasm();
+            updateSharedArrayWasmZeroCopy();
+        }
+
+        // 更新共享数组并发送到Worker
+        function updateSharedArray() {
+            if (!isRunning || !sharedArray) return;
+
+            // 填充共享数组
+            for (let i = 0; i < bufferSize; i++) {
+                sharedArray[i] = Math.floor(Math.random() * 10);
+            }
+
+            calculationCount++;
+            resultContainer.innerHTML = `<div class="result-item">开始计算 #${calculationCount}...</div>`;
+            // 发送数据到 worker 进行处理
+            worker.postMessage({
+                action: 'process',
+                buffer: sharedArrayBuffer
+            });
+        }
+
+
+        function updateSharedArrayWasm() {
+            if (!isRunning || !sharedArrayWasm) return;
+
+            // 填充共享数组
+            for (let i = 0; i < bufferSize; i++) {
+                sharedArrayWasm[i] = Math.floor(Math.random() * 10);
+            }
+            calculationCountWasm++;
+            resultContainerWasm.innerHTML = `<div class="result-item">开始计算 #${calculationCountWasm}...</div>`;
+            workerWasm.postMessage({
+                action: 'process',
+                buffer: sharedArrayBufferWasm
+            });
+        }
+
+        function updateSharedArrayWasmZeroCopy() {
+            if (!isRunning || !sharedArrayWasmZeroCopy) return;
+
+            // 填充共享数组
+            for (let i = 0; i < bufferSize; i++) {
+                sharedArrayWasmZeroCopy[i] = Math.floor(Math.random() * 10);
+            }
+
+            calculationCountWasmZeroCopy++;
+            resultContainerWasmZeroCopy.innerHTML = `<div class="result-item">开始计算 #${calculationCountWasmZeroCopy}...</div>`;
+            workerWasmZeroCopy.postMessage({
+                action: 'process',
+                buffer: sharedArrayBufferWasmZeroCopy
+            });
+        }
+
+        // 清理资源
+        function cleanupResources() {
+            isRunning = false;
+
+            if (timer) {
+                clearTimeout(timer);
+                timer = null;
+            }
+            if (timer1) {
+                clearTimeout(timer1);
+                timer1 = null;
+            }
+            if (timer2) {
+                clearTimeout(timer2);
+                timer2 = null;
+            }
+            if (worker) {
+                worker.postMessage({ action: 'terminate' });
+                worker.terminate();
+                worker = null;
+            }
+            if (workerWasm) {
+                workerWasm.postMessage({ action: 'terminate' });
+                workerWasm.terminate();
+                workerWasm = null;
+            }
+            if (workerWasmZeroCopy) {
+                workerWasmZeroCopy.postMessage({ action: 'terminate' });
+                workerWasmZeroCopy.terminate();
+                workerWasmZeroCopy = null;
+            }
+            // 释放共享数组引用
+            sharedArray = null;
+            sharedArrayBuffer = null;
+            sharedArrayWasm = null;
+            sharedArrayBufferWasm = null;
+            sharedArrayWasmZeroCopy = null;
+            sharedArrayBufferWasmZeroCopy = null;
+        }
+
+
+
+        // 事件监听
+        startBtn.addEventListener('click', () => {
+            if (!isRunning) {
+                initTest();
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            cleanupResources();
+            resultContainer.innerHTML = "测试已停止";
+            resultContainerWasm.innerHTML = "测试已停止";
+            resultContainerWasmZeroCopy.innerHTML = "测试已停止";
+        });
+
+
+        // 页面卸载时清理资源
+        window.addEventListener('beforeunload', cleanupResources);
+        window.addEventListener('unload', cleanupResources);
+
+    </script>
+</body>
+
+</html>
