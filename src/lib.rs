@@ -1,54 +1,25 @@
-// use wasm_bindgen::prelude::*;
-
-//方案1：直接传递数组
-// #[wasm_bindgen]
-// pub fn get_sum(data: &[i32]) -> i32 {
-//     let mut sum=0;
-//     for i in data.iter() {
-//         let fib_input = (i + 15).min(25);
-//         let result = fibonacci(fib_input);
-//         sum += result;
-//     }
-//     sum
-// }
-
-// #[wasm_bindgen]
-// pub fn fibonacci(n: i32) -> i32 {
-//     if n <= 1 {
-//         n
-//     } else {
-//         fibonacci(n - 1) + fibonacci(n - 2)
-//     }
-// }
-
-
-//共享内存方案
+//对应server下pkg_1
+// 传入内存偏移和长度
+// 更灵活，JS 直接传指针（偏移）和长度
+// 更加适合共享内存 js与wasm之间的数据传递
 use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-use web_sys::console;
+
+use js_sys::{Uint32Array, WebAssembly};
 
 #[wasm_bindgen]
-extern "C" {
-    
-    #[wasm_bindgen(js_namespace = WebAssembly)]
-    static memory: JsValue;
-}
-
-#[wasm_bindgen]
-pub fn get_sum(offset: u32, length: u32) -> i32 {
-    //让 Rust 端通过 JS 的共享内存读取数据。
-    let memory_buffer = js_sys::Uint32Array::new(&memory);
-
+pub fn get_sum(memory: &WebAssembly::Memory, offset: usize, length: usize) -> u32 {
+    let buffer = memory.buffer();
+    let data = Uint32Array::new(&buffer)
+        .subarray(offset as u32, (offset + length) as u32);
     let mut sum = 0;
     for i in 0..length {
-        let val = memory_buffer.get_index((offset + i) as u32) as i32;
+        let val = data.get_index(i as u32) as i32;  // 读取时转为i32
         let fib_input = (val + 15).min(25);
-        let result = fibonacci(fib_input);
-        sum += result;
+        sum += fibonacci(fib_input) as u32;  // 结果累加为u32
     }
-
     sum
 }
+
 
 #[wasm_bindgen]
 pub fn fibonacci(n: i32) -> i32 {
@@ -58,4 +29,3 @@ pub fn fibonacci(n: i32) -> i32 {
         fibonacci(n - 1) + fibonacci(n - 2)
     }
 }
-

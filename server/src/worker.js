@@ -60,3 +60,4 @@ self.onmessage = (e) => {
     cleanup();
   }
 };
+self.postMessage({action:'ready'})

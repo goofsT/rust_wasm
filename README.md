@@ -3,14 +3,8 @@
 本项目展示了如何使用Rust编译WebAssembly (WASM)，并在浏览器中实现高性能计算场景的优化。项目通过三种不同的方法实现了斐波那契数列的计算，并对比了它们的性能差异：
 1. 纯JavaScript实现
 2. WebAssembly标准实现
-3. WebAssembly零拷贝优化实现
+3. WebAssembly修改实现
 
-## 环境要求
-
-- [Rust](https://www.rust-lang.org/tools/install) (推荐1.70.0或更高版本)
-- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) (用于编译Rust到WebAssembly)
-- [Node.js](https://nodejs.org/) (推荐16.0.0或更高版本)
-- [npm](https://www.npmjs.com/) 或 [yarn](https://yarnpkg.com/)
 
 ## 项目结构
 
@@ -33,6 +27,8 @@ wasm_rust_demo/
 
 ## 编译步骤
 
+需要有rust编译环境
+
 ### 1. 编译Rust到WebAssembly
 
 ```bash
@@ -44,6 +40,9 @@ wasm-pack build --target web --out-dir server/src/pkg
 
 # 编译零拷贝WASM版本
 wasm-pack build --target web --out-dir server/src/pkg_zero_copy
+
+
+可以修改lib.rs中的rust代码，然后进行打包后进行测试
 ```
 
 ### 2. 启动Node.js服务器
@@ -72,7 +71,7 @@ npm start
 
 项目实现了两种WASM方案：
 1. 标准方案：直接传递数组数据
-2. 零拷贝方案：通过共享内存传递数据，减少内存拷贝开销
+2. 修改方案：通过共享内存传递数据，减少内存拷贝开销（实际优化并不明显，还在学习）
 
 ### 服务器配置 (server.js)
 
@@ -87,15 +86,15 @@ npm start
 - worker-wasm.js: 标准WASM实现
 - worker-wasm-zero-copy.js: WASM零拷贝实现
 
-## 性能对比
+## 总结
 
-在大量数据的极端计算场景下，三种实现方式的性能差异显著：
+经过，不采用wasm和采用wasm两种实现方式的性能差异显著：
 1. 纯JavaScript实现：性能最差，CPU使用率高
-2. 标准WASM实现：性能优于JavaScript，但仍有数据拷贝开销
-3. 零拷贝WASM实现：性能最佳，几乎没有数据拷贝开销
+2. 标准WASM实现：性能优于JavaScript，但仍有数据拷贝开销  （有绝对的零拷贝方案，但是还没研究出来，基于wasm memory ，实现主线程，worker，wasm共用内存块）
+3. 在海量数据时，测试时采用100000个数据的累加，对于采用传递wasm memory的方式速度明显断层领先
 
 ## 注意事项
 
-- 零拷贝方案需要浏览器支持SharedArrayBuffer
+- 零拷贝方案需要浏览器支持SharedArrayBuffer（本测试采用node搭建express服务实现）
 - 需要通过HTTPS或localhost访问，否则SharedArrayBuffer可能不可用
 - 本示例使用的斐波那契计算故意采用了低效递归实现，以突显性能差异
