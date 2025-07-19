@@ -1,6 +1,5 @@
 //对应server下pkg_1
-// 传入内存偏移和长度
-// 更灵活，JS 直接传指针（偏移）和长度
+//传入WebAssemably memory
 // 更加适合共享内存 js与wasm之间的数据传递
 use wasm_bindgen::prelude::*;
 

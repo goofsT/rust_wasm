@@ -65,13 +65,15 @@ npm start
 3. 观察各个实现的性能差异，包括处理时间和内存使用情况
 4. 点击"停止测试"按钮可以停止计算
 
+通过调整`index.html`中的`bufferSize`可以修改每次的计算元素个数
+
 ## 实现细节
 
 ### Rust代码 (lib.rs)
 
 项目实现了两种WASM方案：
 1. 标准方案：直接传递数组数据
-2. 修改方案：通过共享内存传递数据，减少内存拷贝开销（实际优化并不明显，还在学习）
+2. 修改方案：通过共享内存传递数据，减少内存拷贝开销（实际优化并不明显，还在学习真正意义共享内存）
 
 ### 服务器配置 (server.js)
 
@@ -84,14 +86,13 @@ npm start
 通过Web Workers在后台线程执行计算密集型任务，避免阻塞主线程：
 - worker.js: 纯JavaScript实现
 - worker-wasm.js: 标准WASM实现
-- worker-wasm-zero-copy.js: WASM零拷贝实现
+- worker-wasm-memory.js: WASMmemory传递实现
 
 ## 总结
 
 经过，不采用wasm和采用wasm两种实现方式的性能差异显著：
 1. 纯JavaScript实现：性能最差，CPU使用率高
 2. 标准WASM实现：性能优于JavaScript，但仍有数据拷贝开销  （有绝对的零拷贝方案，但是还没研究出来，基于wasm memory ，实现主线程，worker，wasm共用内存块）
-3. 在海量数据时，测试时采用100000个数据的累加，对于采用传递wasm memory的方式速度明显断层领先
 
 ## 注意事项
 

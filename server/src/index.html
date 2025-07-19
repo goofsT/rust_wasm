@@ -109,8 +109,8 @@
             sharedArrayWasm = new Int32Array(sharedArrayBufferWasm);
 
             sharedArrayBufferWasmZeroCopy = new WebAssembly.Memory({
-                initial: 1,
-                maximum: 1,
+                initial: 10,
+                maximum: 10,
                 shared: true,
             });
             sharedArrayWasmZeroCopy = new Int32Array(sharedArrayBufferWasmZeroCopy.buffer);;
@@ -228,6 +228,7 @@
             for (let i = 0; i < bufferSize; i++) {
                 sharedArrayWasmZeroCopy[i] = Math.floor(Math.random() * 10);
             }
+            console.log(sharedArrayWasmZeroCopy)
 
             calculationCountWasmZeroCopy++;
             resultContainerWasmZeroCopy.innerHTML = `<div class="result-item">开始计算 #${calculationCountWasmZeroCopy}...</div>`;
